@@ -1,0 +1,78 @@
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define LAST_MESSAGE 255 // Message type for termination of program task11-1b.c
+
+int main(void)
+{
+    int msqid;
+    char pathname[]="task11-1a.c";
+
+    key_t  key;
+    int i,len;
+
+    struct mymsgbuf
+    {
+        long mtype;
+
+        struct {
+            char mtext[81];
+            int minteger;
+        } info;
+
+    } mybuf;
+    if ((key = ftok(pathname,0)) < 0) {
+        printf("Can\'t generate key\n");
+        exit(-1);
+    }
+    //
+    // Trying to get access by key to the message queue, if it exists,
+    // or create it, with read & write access for all users.
+    //
+    if ((msqid = msgget(key, 0666 | IPC_CREAT)) < 0) {
+        printf("Can\'t get msqid\n");
+        exit(-1);
+    }
+
+    /* Send information */
+
+    for (i = 1; i <= 5; i++) {
+        //
+        // Fill in the structure for the message and
+        // determine the length of the informative part.
+        //
+        mybuf.mtype = 1;
+
+        // Filling with values;
+        strcpy(mybuf.info.mtext, "Message with structure");
+        mybuf.info.minteger = i;
+
+        len = sizeof(mybuf.info);
+        //
+        // Send the message. If there is an error,
+        // report it and delete the message queue from the system.
+        //
+        if (msgsnd(msqid, (struct msgbuf *) &mybuf, len, 0) < 0) {
+            printf("Can\'t send message to queue\n");
+            msgctl(msqid, IPC_RMID, (struct msqid_ds *) NULL);
+            exit(-1);
+        }
+    }
+
+    // Ending message.
+
+    mybuf.mtype = LAST_MESSAGE;
+    len         = 0;
+
+    if (msgsnd(msqid, (struct msgbuf *) &mybuf, len, 0) < 0) {
+        printf("Can\'t send message to queue\n");
+        msgctl(msqid, IPC_RMID, (struct msqid_ds *) NULL);
+        exit(-1);
+    }
+
+    return 0;
+}
